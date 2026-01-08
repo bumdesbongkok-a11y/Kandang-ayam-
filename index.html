@@ -100,6 +100,9 @@ th{background:#c8e6c9}
 <button class="menu-btn" onclick="openMenu('Pakan')">
  <span>🌾</span>Pakan
 </button>
+<button class="menu-btn" onclick="openMenu('BeritaAcara')">
+  📝 Berita Acara
+</button>
 </div>
 </div>
 </div>
@@ -453,6 +456,68 @@ th{background:#c8e6c9}
 </div>
 </div>
 </div>
+<!-- BERITA ACARA -->
+<div class="section" id="sectionBeritaAcara">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+
+<div class="card">
+<h3>📝 Berita Acara Kandang</h3>
+
+<input type="hidden" id="editBeritaAcara">
+
+<input type="date" id="ba_tanggal">
+
+<textarea id="ba_uraian" placeholder="Uraian kejadian"></textarea>
+
+<input type="file" id="ba_foto" accept="image/*" capture="environment">
+
+<button class="simpan" onclick="simpanBeritaAcara()">Simpan / Update</button>
+
+<!-- Filter Bulan & Tahun -->
+<label for="filterBulanBA">Pilih Bulan:</label>
+<select id="filterBulanBA">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunBA">Pilih Tahun:</label>
+<select id="filterTahunBA">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" onclick="filterBeritaAcara()">Tampilkan</button>
+
+<table>
+<thead>
+<tr>
+  <th>Tanggal</th>
+  <th>Uraian</th>
+  <th>Foto</th>
+  <th>Aksi</th>
+</tr>
+</thead>
+<tbody id="dataBeritaAcara"></tbody>
+</table>
+
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
@@ -921,9 +986,104 @@ btnFilterPakan.addEventListener('click', () => {
  tampilPakan();
 });
 
+/* === BERITA ACARA === */
+window.simpanBeritaAcara = async () => {
+
+ const file = ba_foto.files[0] || null;
+ let fotoURL = "";
+
+ // upload foto jika ada
+ if(file){
+  const refFoto = ref(
+   storage,
+   `berita_acara/${Date.now()}_${file.name}`
+  );
+  await uploadBytes(refFoto, file);
+  fotoURL = await getDownloadURL(refFoto);
+ }
+
+ const data = {
+  tanggal: ba_tanggal.value,
+  uraian: ba_uraian.value || "",
+  foto: fotoURL
+ };
+
+ editBeritaAcara.value
+  ? await updateDoc(
+     doc(db,"berita_acara",editBeritaAcara.value),
+     data
+    )
+  : await addDoc(
+     collection(db,"berita_acara"),
+     data
+    );
+
+ editBeritaAcara.value = "";
+ ba_foto.value = "";
+ tampilBeritaAcara();
+};
+
+async function tampilBeritaAcara(){
+ dataBeritaAcara.innerHTML="";
+
+ const snap = await getDocs(
+  query(collection(db,"berita_acara"), orderBy("tanggal","asc"))
+ );
+
+ snap.forEach(d=>{
+  const x = d.data();
+  const tglData = new Date(x.tanggal);
+
+  if(
+   tglData.getMonth() !== bulanFilterBA ||
+   tglData.getFullYear() !== tahunFilterBA
+  ) return;
+
+  dataBeritaAcara.innerHTML += `
+<tr>
+ <td>${x.tanggal}</td>
+ <td>${x.uraian || "-"}</td>
+ <td>
+  ${x.foto ? `<a href="${x.foto}" target="_blank">Lihat</a>` : "-"}
+ </td>
+ <td>
+  <button class="edit"
+   onclick="editBeritaAcara(
+    '${d.id}',
+    '${x.tanggal}',
+    '${x.uraian || ""}'
+   )">Edit</button>
+  <button class="hapus"
+   onclick="hapus('berita_acara','${d.id}')">Hapus</button>
+ </td>
+</tr>`;
+ });
+}
+
+window.editBeritaAcara = (i,t,u) => {
+ editBeritaAcara.value = i;
+ ba_tanggal.value = t;
+ ba_uraian.value = u;
+};
+
+/* === FILTER BERITA ACARA === */
+let bulanFilterBA = new Date().getMonth();
+let tahunFilterBA = new Date().getFullYear();
+
+window.filterBeritaAcara = () => {
+
+ const bulan = filterBulanBA.value;
+ const tahun = filterTahunBA.value;
+
+ bulanFilterBA = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+ tahunFilterBA = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+
+ tampilBeritaAcara();
+};
+
 window.hapus=async(c,i)=>{await deleteDoc(doc(db,c,i));loadAll();}
 function loadAll(){tampilProduksi();tampilJual();tampilKeluar();tampilUmurAyam();tampilPopulasi();
-  tampilPakan();
+  tampilPakan();tampilBeritaAcara();
 }
 
 // ============================
