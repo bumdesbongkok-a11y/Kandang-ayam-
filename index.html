@@ -103,6 +103,9 @@ th{background:#c8e6c9}
 <button class="menu-btn" onclick="openMenu('BeritaAcara')">
   📝 Berita Acara
 </button>
+<button class="menu-btn" onclick="openMenu('PemberianObat')">
+  💊 Pemberian Obat
+</button>
 </div>
 </div>
 </div>
@@ -115,7 +118,7 @@ th{background:#c8e6c9}
   transform: translateX(-50%);
   height: 50px;
   width: 50px;
-  display: none;
+  display  : none;
   align-items: center;
   justify-content: center;
   z-index: 1000;
@@ -517,7 +520,72 @@ th{background:#c8e6c9}
 
 </div>
 </div>
+<!-- PEMBERIAN OBAT -->
+<div class="section" id="sectionPemberianObat">
+  <button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
 
+  <div class="card">
+    <h3>💊 Pemberian Obat</h3>
+
+    <input type="hidden" id="editObat">
+
+    <input type="date" id="obat_tanggal">
+
+    <!-- Nama Obat -->
+    <input list="listNamaObat" id="obat_nama" placeholder="Nama Obat">
+    <datalist id="listNamaObat"></datalist>
+
+    <!-- Dosis -->
+    <input id="obat_dosis" placeholder="Dosis (misal: 1 ml / liter)">
+
+    <!-- Keterangan -->
+    <input id="obat_keterangan" placeholder="Keterangan">
+
+    <button class="simpan" onclick="simpanObat()">Simpan / Update</button>
+
+    <!-- Filter -->
+    <label>Pilih Bulan:</label>
+    <select id="filterBulanObat">
+      <option value="">Bulan Aktif</option>
+      <option value="0">Januari</option>
+      <option value="1">Februari</option>
+      <option value="2">Maret</option>
+      <option value="3">April</option>
+      <option value="4">Mei</option>
+      <option value="5">Juni</option>
+      <option value="6">Juli</option>
+      <option value="7">Agustus</option>
+      <option value="8">September</option>
+      <option value="9">Oktober</option>
+      <option value="10">November</option>
+      <option value="11">Desember</option>
+    </select>
+
+    <label>Pilih Tahun:</label>
+    <select id="filterTahunObat">
+      <option value="">Tahun Aktif</option>
+      <option value="2024">2024</option>
+      <option value="2025">2025</option>
+      <option value="2026">2026</option>
+    </select>
+
+    <button class="simpan" onclick="filterObat()">Tampilkan</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tanggal</th>
+          <th>Nama Obat</th>
+          <th>Dosis</th>
+          <th>Keterangan</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="dataObat"></tbody>
+    </table>
+
+  </div>
+</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
@@ -1080,10 +1148,128 @@ window.filterBeritaAcara = () => {
 
  tampilBeritaAcara();
 };
+/* === PEMBERIAN OBAT === */
+
+/* FILTER DEFAULT (AUTO BULAN AKTIF) */
+let bulanFilterObat = new Date().getMonth();
+let tahunFilterObat = new Date().getFullYear();
+
+/* SIMPAN / UPDATE OBAT */
+window.simpanObat = async () => {
+
+ const data = {
+  tanggal: obat_tanggal.value,
+  namaObat: obat_nama.value || "",
+  dosis: obat_dosis.value || "",
+  keterangan: obat_keterangan.value || ""
+ };
+
+ // simpan / update data obat
+ editObat.value
+  ? await updateDoc(
+     doc(db, "pemberian_obat", editObat.value),
+     data
+    )
+  : await addDoc(
+     collection(db, "pemberian_obat"),
+     data
+    );
+
+ // simpan nama obat agar bisa dipilih ulang
+ if (data.namaObat) {
+  await setDoc(
+   doc(db, "list_nama_obat", data.namaObat),
+   { nama: data.namaObat },
+   { merge: true }
+  );
+ }
+
+ // reset form
+ editObat.value = "";
+ obat_tanggal.value = "";
+ obat_nama.value = "";
+ obat_dosis.value = "";
+ obat_keterangan.value = "";
+
+ // refresh data
+ tampilObat();
+ loadNamaObat();
+};
+
+/* TAMPIL DATA OBAT */
+async function tampilObat() {
+ dataObat.innerHTML = "";
+
+ const snap = await getDocs(
+  query(
+   collection(db, "pemberian_obat"),
+   orderBy("tanggal", "asc")
+  )
+ );
+
+ snap.forEach(d => {
+  const x = d.data();
+  const tglData = new Date(x.tanggal);
+
+  if (
+   tglData.getMonth() !== bulanFilterObat ||
+   tglData.getFullYear() !== tahunFilterObat
+  ) return;
+
+  dataObat.innerHTML += `
+<tr>
+ <td>${x.tanggal}</td>
+ <td>${x.namaObat || "-"}</td>
+ <td>${x.dosis || "-"}</td>
+ <td>${x.keterangan || "-"}</td>
+ <td>
+  <button class="edit"
+   onclick="editObat(
+    '${d.id}',
+    '${x.tanggal}',
+    '${x.namaObat || ""}',
+    '${x.dosis || ""}',
+    '${x.keterangan || ""}'
+   )">Edit</button>
+  <button class="hapus"
+   onclick="hapus('pemberian_obat','${d.id}')">Hapus</button>
+ </td>
+</tr>`;
+ });
+}
+
+/* EDIT OBAT */
+window.editObat = (id, tgl, nama, dosis, ket) => {
+ editObat.value = id;
+ obat_tanggal.value = tgl;
+ obat_nama.value = nama;
+ obat_dosis.value = dosis;
+ obat_keterangan.value = ket;
+};
+
+/* LOAD LIST NAMA OBAT (DATALIST) */
+async function loadNamaObat() {
+ listNamaObat.innerHTML = "";
+ const snap = await getDocs(collection(db, "list_nama_obat"));
+ snap.forEach(d => {
+  listNamaObat.innerHTML += `<option value="${d.id}"></option>`;
+ });
+}
+
+/* FILTER OBAT (MANUAL JIKA DIPAKAI) */
+window.filterObat = () => {
+ const bulan = filterBulanObat.value;
+ const tahun = filterTahunObat.value;
+
+ bulanFilterObat = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+ tahunFilterObat = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+
+ tampilObat();
+};
 
 window.hapus=async(c,i)=>{await deleteDoc(doc(db,c,i));loadAll();}
 function loadAll(){tampilProduksi();tampilJual();tampilKeluar();tampilUmurAyam();tampilPopulasi();
-  tampilPakan();tampilBeritaAcara();
+  tampilPakan();tampilBeritaAcara();tampilObat();loadNamaObat();
 }
 
 // ============================
